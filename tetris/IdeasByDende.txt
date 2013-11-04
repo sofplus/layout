@@ -1,0 +1,56 @@
+Tetris is essentially collision THROUGH a jar
+Where the jar is represented by a 2 dimensional array or any grid like structure
+
+I have concluded there are 2 methods that i know of to go about the collision...
+METHOD_1:
+	Store the position of each 4 dropping tiles, thus when the left key is pressed
+	, each tile is moved to the left. Detection will thus be applied on each TILE.
+
+	When the shapes spawn, the 4 positions wil be initialised depending upon which
+	shape is spawning.
+
+	DISADVANTAGES
+		requiring to store 4 positions in global memory.
+		
+	ADVANTAGES
+		less lines of code required
+		more generic
+
+METHOD_2:
+	Depending on 'current' shape/rotation do pre-programmed check
+	Each rotation's shape/form is stored individually in the form of basePos+offsetX's
+	and basePos+offsetY's .. ( for each x offset and each y offset ).  This will make
+	it possible to re-create a shape's structure when ever it needs to be tested if
+	it can be drawn at a certain 'base position'.  That base position means that only
+	1 position must be moved when the user isseus an event(eg move left).
+
+	So in other words, the other 3 segments of the shape will be created on the fly, as
+	offsets from the base position, this must be done for each requested movement.
+
+	DISADVANTAGES
+		requiring to store some offsets for each shape/rotation
+	ADVANTAGES
+		Less picn entires in the "layout string" sent to clients
+		1 global position in memory - the base position
+
+		Can code specific funtions for each shape and direction, maybe having
+		tricks in there for efficiency. Example, Moving a shape right, which
+		has width >1 will mean the left most on that width line wont need to be
+		tested for collision.
+
+Problem thought.
+	If we clear the screen each frame it will mean that the "jar" contents must be
+	redrawn.  The jar content , because of the "line is complete" drop everything
+	above down, feature.. The jar content is granular and pixelated, i mean to the
+	individual tile size, not pre-formed shape size.  Secondly, if we want colour
+	to be preserved, we must have an individual tile texture for each colour. This
+	makes me think its unnecesary perhaps to use METHOD_2 .. and stick with METHOD_1
+
+CONCLUSION:
+	METHOD_2 is portraying my creativity and will to not give in to the temptation of
+	an easy solution.  Wanting to make sure there is not a more efficient approach.
+	Anyhow i think its quite clear it will be less efficient to use such a method,
+	thus i am going to use METHOD_1.
+
+NB. I also want to code Dr.Mario and Bubble Bobble, those are both great games!!
+		
