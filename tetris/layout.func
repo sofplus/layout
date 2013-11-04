@@ -1,0 +1,68 @@
+//SP_FLAG_LAYOUT
+//SP_FLAG_TYPEAMATIC = SCR_CinematicString
+//SP_FLAG_CAPTIONED = will print if cl_subtitles is "1" OR it was combined with flag SP_FLAG_ALWAYS_PRINT
+//SP_FLAG_CREDIT = SCR_FadePic
+//SP_FLAG_BLINK
+//SP_FLAG_CENTERED
+//SP_FLAG_ORIGINAL
+
+//xl = xpos from left
+//xr = xpos from right
+//xv = some standardized center -160
+//yt = ypos from top
+//yb = ypos from bottom
+//yv = some standardized center -120
+//picn = a picture
+//client_sb
+//client_ctf_sb
+//spect_sb
+//team_sb
+//client_conq_sb
+//ctf_team_sb
+//control_team_sb
+//string
+//altstring
+//tc
+//ac
+function fn_layout_Init()
+{
+	set layout_oldintermission #_sp_sv_intermission_end
+	zero _sp_sv_intermission_end
+	//1 second timelimitm to instant enter intermission
+	timelimit "0.01"
+	//pause it
+	sp_sc_timer 500 "paused 1"
+}
+
+ function fn_layout_DrawImage(~who,~pic,~x,~y)
+ {
+
+ 	set ~fx 160;set ~fy 120;sp_sc_cvar_math_sub ~fx #~x;sp_sc_cvar_math_sub ~fy #~y
+ 	sset ~string xv #~fx yv #~fy picn #~pic
+ 	sp_sc_flow_if number cvar ~who == val "-1"
+ 	{
+ 		sp_sv_print_sp_broadcast 45 #~string
+ 	}
+ 	else
+ 	{
+ 		sp_sv_print_sp_client #~who 45 #~string
+ 	}
+ 	
+ }
+
+ function fn_layout_DoIt()
+ {
+ 	sp_sc_func_exec fn_layout_Clear 0
+ 	sp_sc_func_exec fn_layout_DrawImage 0 pics/black640 320 320
+ }
+ function fn_layout_Clear(~who)
+ {
+ 	sp_sc_flow_if number cvar ~who == val "-1"
+ 	{
+ 		sp_sv_print_sp_broadcast 45 *
+ 	}
+ 	else
+ 	{
+ 		sp_sv_print_sp_client #~who 45 *
+ 	}
+ }
