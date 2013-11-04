@@ -1,3 +1,31 @@
+//Will tetris look like this 10x20 area for tetris
+//tetris_line_0 = "0000000000"
+//tetris_line_1 = "0000000001"
+//tetris_line_2 = "0000000001"
+//tetris_line_3 = "0000000001"
+//tetris_line_4 = "0000000001"
+//tetris_line_5 = "0000000000"
+//tetris_line_6 = "0000000000"
+//tetris_line_7 = "0000000000"
+//tetris_line_8 = "0000000000"
+//tetris_line_9 = "0000000000"
+//tetris_line_10= "0000000000"
+//tetris_line_11= "0000000000"
+//tetris_line_12= "0000000000"
+//tetris_line_13= "0000000000"
+//tetris_line_14= "0000000000"
+//tetris_line_15= "0000000000"
+//tetris_line_16= "1111111100"
+//tetris_line_17= "1111111110"
+//tetris_line_18= "1111111110"
+//tetris_line_19= "1111111110"
+
+//a line moving down, it should complete the bottom 3
+//ON land - check complete lines.
+
+
+
+
 //HORIZONTAL TETRIS ON A 10X17 GRID
  //---------------------
  //Tetris concepts
