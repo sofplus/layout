@@ -22,7 +22,7 @@
 
 //a line moving down, it should complete the bottom 3
 //ON land - check complete lines.
-
+//logic rules for allowing rotation to take place or not needed
 
 
 
