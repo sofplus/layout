@@ -53,4 +53,8 @@ CONCLUSION:
 	thus i am going to use METHOD_1.
 
 NB. I also want to code Dr.Mario and Bubble Bobble, those are both great games!!
+
+EXTRA:
+	The Game defeat condition is when the shape cannot spawn because its collided on
+	spawn.
 		

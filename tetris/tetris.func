@@ -1,0 +1,350 @@
+//x==4 is the location where the 'rotTile' is spawned
+function fn_tet_OneTimeVars
+{
+	set _tet_bool "0"
+	set _tet_spawn "0"
+
+	set _tet_jug_width "10"
+	set _tet_jug_height "19" //18+1 offscreen at top to allow instant rotation
+
+	set _tet_loop_run "0"
+	set _tet_loop_busy "0"
+}
+
+function fn_tet_ReloadGame
+{
+	//clear entire jug
+	set ~i 0
+	sp_sc_flow_while number cvar ~i < cvar _tet_jug_height
+	{
+		set _tet_jug_line_$i "0000000000"
+		add ~i 1
+	}
+
+	zero _tet_seg_1_x;zero _tet_seg_1_y
+	zero _tet_seg_2_x;zero _tet_seg_2_y
+	zero _tet_seg_3_x;zero _tet_seg_3_y
+	zero _tet_seg_4_x;zero _tet_seg_4_y
+
+	zero _tet_seg_base
+}
+//shapes defined from left to right in chain if possible
+function fn_tet_Spawn()
+{
+	sp_sc_cvar_random_int ~rand 1 7
+
+	//square
+	sp_sc_flow_if number cvar ~rand == val "1"
+	{
+		set _tet_seg_1_x "4";set _tet_seg_1_y "17"
+		set _tet_seg_2_x "4";set _tet_seg_2_y "16"
+		set _tet_seg_3_x "5";set _tet_seg_3_y "17"
+		set _tet_seg_4_x "5";set _tet_seg_4_y "16"
+		//there is no base(special case for square)
+		set _tet_seg_base "0"
+	}
+	//middle_finger
+	sp_sc_flow_if number cvar ~rand == val "2"
+	{
+		set _tet_seg_1_x "3";set _tet_seg_1_y "17"
+		set _tet_seg_2_x "4";set _tet_seg_2_y "17"
+		set _tet_seg_3_x "4";set _tet_seg_3_y "16"
+		set _tet_seg_4_x "5";set _tet_seg_4_y "17"
+		set _tet_seg_base "2"
+	}
+	//z
+	sp_sc_flow_if number cvar ~rand == val "3"
+	{
+		set _tet_seg_1_x "3";set _tet_seg_1_y "17"
+		set _tet_seg_2_x "4";set _tet_seg_2_y "17"
+		set _tet_seg_3_x "4";set _tet_seg_3_y "16"
+		set _tet_seg_4_x "5";set _tet_seg_4_y "16"
+		set _tet_seg_base "2"
+	}
+	//L
+	sp_sc_flow_if number cvar ~rand == val "4"
+	{
+		set _tet_seg_1_x "3";set _tet_seg_1_y "16"
+		set _tet_seg_2_x "3";set _tet_seg_2_y "17"
+		set _tet_seg_3_x "4";set _tet_seg_3_y "17"
+		set _tet_seg_4_x "5";set _tet_seg_4_y "17"
+		set _tet_seg_base "3"
+	}
+	//s
+	sp_sc_flow_if number cvar ~rand == val "5"
+	{
+		set _tet_seg_1_x "3";set _tet_seg_1_y "16"
+		set _tet_seg_2_x "4";set _tet_seg_2_y "17"
+		set _tet_seg_3_x "4";set _tet_seg_3_y "16"
+		set _tet_seg_4_x "5";set _tet_seg_4_y "17"
+		set _tet_seg_base "2"
+	}
+	//line
+	sp_sc_flow_if number cvar ~rand == val "6"
+	{
+		set _tet_seg_1_x "3";set _tet_seg_1_y "16"
+		set _tet_seg_2_x "4";set _tet_seg_2_y "16"
+		set _tet_seg_3_x "5";set _tet_seg_3_y "16"
+		set _tet_seg_4_x "6";set _tet_seg_4_y "16"
+		set _tet_seg_base "2"
+	}
+	//reversed L
+	sp_sc_flow_if number cvar ~rand == val "7"
+	{
+		set _tet_seg_1_x "3";set _tet_seg_1_y "16"
+		set _tet_seg_2_x "4";set _tet_seg_2_y "16"
+		set _tet_seg_3_x "5";set _tet_seg_3_y "16"
+		set _tet_seg_4_x "5";set _tet_seg_4_y "17"
+		set _tet_seg_base "2"
+	}
+}
+//0=empty
+//1=red(square)
+//2=yellow(_|_)
+//3=green(z)
+//4=blue(L)
+//5=lightblue(s)
+//6=orange(line)
+//7=pink(reversed L)
+function fn_tet_WriteToJug(~x,~y,~val)
+{
+	//get what is before insert point
+	sp_sc_cvar_substr ~tmp _tet_jug_line_$~y 0 #~x
+	//append new value to that
+	sp_sc_cvar_append ~tmp #~val
+	//get what is after insert point
+	add ~x 1;sp_sc_cvar_copy ~tmp3 _tet_jug_width;sp_sc_cvar_math_sub ~tmp3 #~x;sp_sc_cvar_substr ~tmp2 _tet_jug_line_$~y #~x #~tmp3
+	//append that to the tmp cvar
+	sp_sc_cvar_append ~tmp #~tmp2
+}
+
+function fn_tet_DoesCollide(~x,~y)
+{
+	sp_sc_flow_if number cvar ~x < val "0"
+	{
+		set bool 1
+	}
+	else
+	{
+		sp_sc_flow_if number cvar ~x > val "18"
+		{
+			set bool 1
+		}
+		else
+		{
+			sp_sc_flow_if number cvar ~y < val "0"
+			{
+				set bool 1
+			}
+			else
+			{
+				//out of bound checks complete
+				//now focus on jug comparisons
+				sp_sc_cvar_substr ~tmp _tet_jug_line_$~y #~x 1
+				sp_sc_flow_if number cvar ~tmp != val "0"
+				{
+					set bool 1
+				}
+				else
+				{
+					set bool 0
+				}
+			}
+		}
+	}
+}
+
+function .tetris_start(~slot)
+{
+    sp_sc_flow_if number cvar _tet_loop_busy == val "1"
+    {
+        say "please wait for current timer to unload"
+    }
+    else
+    {
+    	sp_sc_func_exec fn_tet_Spawn
+        set _tet_loop_run "1"
+        set _tet_loop_busy "1"
+        sp_sc_func_exec fn_tet_loop
+    }
+}
+
+function .tetris_stop(~slot)
+{
+    sp_sc_flow_if number cvar _tet_loop_busy == val "1"
+    {
+        set _tet_loop_run "0"
+    }
+}
+
+function fn_tet_loop()
+{
+	sp_sc_flow_if number cvar _tet_spawn == val "1"
+	{
+		set _tet_spawn 0
+		sp_sc_func_exec fn_tet_Spawn
+	}
+	else
+	{
+		//loop code here
+		set ~collide 0
+		set ~i 0
+		sp_sc_flow_while number cvar ~i < val "4"
+		{
+			sp_sc_cvar_copy ~new_$i_y _tet_seg_$i_y
+			add ~new_$i_y -1
+			sp_sc_func_exec fn_tet_DoesCollide #_tet_seg_$i_x #~new_$i_y
+			sp_sc_flow_if number cvar _tet_bool == val "1"
+			{
+				set ~collide 1
+			}
+		}
+		sp_sc_flow_if number cvar ~collide == val "0"
+		{
+			//apply gravity
+			set ~i 0
+			sp_sc_flow_while number cvar ~i < val "4"
+			{
+				sp_sc_cvar_copy _tet_seg_$i_y ~new_$i_y
+			}	
+		}
+		else
+		{
+			set _tet_spawn 1
+		}
+	}
+
+	
+
+	
+	
+
+
+   sp_sc_flow_if number cvar _tet_loop_run == val "1"
+   {
+       sp_sc_timer #_tet_loop_speed "sp_sc_func_exec fn_tet_loop"
+   }
+   else
+   {
+       set _tet_loop_busy 0
+   }
+}
+
+
+function .tetris_left(~slot)
+{
+	set ~collide 0
+	set ~i 0
+
+	sp_sc_flow_while number cvar ~i < val "4"
+	{
+		sp_sc_cvar_copy ~new_$i_x _tet_seg_$i_x
+		add ~new_$i_x -1
+		sp_sc_func_exec fn_tet_DoesCollide #~new_$i_x #_tet_seg_$i_y
+		sp_sc_flow_if number cvar _tet_bool == val "1"
+		{
+			set ~collide 1
+		}
+	}
+	sp_sc_flow_if number cvar ~collide == val "0"
+	{
+		set ~i 0
+		sp_sc_flow_while number cvar ~i < val "4"
+		{
+			sp_sc_cvar_copy _tet_seg_$i_x ~new_$i_x
+		}
+	}
+}
+function .tetris_right(~slot)
+{
+	set ~collide 0
+	set ~i 0
+
+	sp_sc_flow_while number cvar ~i < val "4"
+	{
+		sp_sc_cvar_copy ~new_$i_x _tet_seg_$i_x
+		add ~new_$i_x 1
+		sp_sc_func_exec fn_tet_DoesCollide #~new_$i_x #_tet_seg_$i_y
+		sp_sc_flow_if number cvar _tet_bool == val "1"
+		{
+			set ~collide 1
+		}
+	}
+	sp_sc_flow_if number cvar ~collide == val "0"
+	{
+		set ~i 0
+		sp_sc_flow_while number cvar ~i < val "4"
+		{
+			sp_sc_cvar_copy _tet_seg_$i_x ~new_$i_x
+		}
+	}
+}
+//function .tetris_down(~slot)
+//{
+//	set ~i 0
+//	sp_sc_flow_while number cvar ~i < val "4"
+//	{
+//
+//	}
+//}
+//function .tetris_harddrop(~slot)
+//{
+//	set ~i 0
+//	sp_sc_flow_while number cvar ~i < val "4"
+//	{
+//
+//	}
+//}
+//clockwise
+function .tetris_rotate1(~slot)
+{
+
+	set ~collide 0
+	set ~i 0
+
+	sp_sc_flow_while number cvar ~i < val "4"
+	{
+		sp_sc_cvar_copy ~new_$i_x _tet_seg_$i_y
+		sp_sc_cvar_copy ~new_$i_y _tet_seg_$i_x
+		sp_sc_func_exec fn_tet_DoesCollide #~new_$i_x #~new_$i_y
+		sp_sc_flow_if number cvar _tet_bool == val "1"
+		{
+			set ~collide 1
+		}
+	}
+	sp_sc_flow_if number cvar ~collide == val "0"
+	{
+		set ~i 0
+		sp_sc_flow_while number cvar ~i < val "4"
+		{
+			sp_sc_cvar_copy _tet_seg_$i_x ~new_$i_x
+			sp_sc_cvar_copy _tet_seg_$i_x ~new_$i_y
+		}
+	}
+}
+//anticlockwise
+function .tetris_rotate2(~slot)
+{
+	set ~collide 0
+	set ~i 0
+
+	sp_sc_flow_while number cvar ~i < val "4"
+	{
+		sp_sc_cvar_copy ~new_$i_x _tet_seg_$i_y;sp_sc_cvar_math_mul ~new_$i_x -1
+		sp_sc_cvar_copy ~new_$i_y _tet_seg_$i_x;sp_sc_cvar_math_mul ~new_$i_y -1
+		sp_sc_func_exec fn_tet_DoesCollide #~new_$i_x #~new_$i_y
+		sp_sc_flow_if number cvar _tet_bool == val "1"
+		{
+			set ~collide 1
+		}
+	}
+	sp_sc_flow_if number cvar ~collide == val "0"
+	{
+		set ~i 0
+		sp_sc_flow_while number cvar ~i < val "4"
+		{
+			sp_sc_cvar_copy _tet_seg_$i_x ~new_$i_x
+			sp_sc_cvar_copy _tet_seg_$i_x ~new_$i_y
+		}
+	}
+}
