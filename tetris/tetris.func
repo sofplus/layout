@@ -1,3 +1,9 @@
+function .tetris_load(~slot)
+{
+	sp_sc_func_exec fn_tet_OneTimeVars
+}
+
+
 //x==4 is the location where the 'rotTile' is spawned
 function fn_tet_OneTimeVars
 {
@@ -167,7 +173,8 @@ function .tetris_start(~slot)
     }
     else
     {
-    	sp_sc_func_exec fn_tet_Spawn
+    	sp_sc_func_exec fn_tet_ReloadGame
+    	set _tet_spawn "1"
         set _tet_loop_run "1"
         set _tet_loop_busy "1"
         sp_sc_func_exec fn_tet_loop
@@ -202,6 +209,7 @@ function fn_tet_loop()
 				say "Game Over"
 				sp_sc_func_exec .tetris_stop 0
 			}
+			add ~i 1
 		}
 
 	}
@@ -219,6 +227,7 @@ function fn_tet_loop()
 			{
 				set ~collide 1
 			}
+			add ~i 1
 		}
 		sp_sc_flow_if number cvar ~collide == val "0"
 		{
@@ -227,13 +236,30 @@ function fn_tet_loop()
 			sp_sc_flow_while number cvar ~i < val "4"
 			{
 				sp_sc_cvar_copy _tet_seg_$i_y ~new_$i_y
+				add ~i 1
 			}	
 		}
 		else
 		{
 			//landed on something, now we want to spawn next frame
 			//also apply line destruction here, checking only lines that the last segment consisted of
+			set ~i 0
+			sp_sc_flow_while number cvar ~i < val "4"
+			{
+				sp_sc_cvar_copy ~tmp _tet_seg_$i_y
+				set ~tmp _tet_jug_line_$~tmp
+				sp_sc_flow_if number cvar #~tmp == val "1111111111"
+				{
+					sp_sc_cvar_copy ~j _tet_seg_$i_y;add ~j 1
+					sp_sc_flow_while number cvar ~j < cvar _tet_jug_height
+					{
 
+					}
+					_tet_seg_$i_y
+					set #~tmp "0000000000"
+				}
+				add ~i 1
+			}
 			set _tet_spawn 1
 		}
 	}
@@ -269,6 +295,7 @@ function .tetris_left(~slot)
 		{
 			set ~collide 1
 		}
+		add ~i 1
 	}
 	sp_sc_flow_if number cvar ~collide == val "0"
 	{
@@ -276,6 +303,7 @@ function .tetris_left(~slot)
 		sp_sc_flow_while number cvar ~i < val "4"
 		{
 			sp_sc_cvar_copy _tet_seg_$i_x ~new_$i_x
+			add ~i 1
 		}
 	}
 }
@@ -293,6 +321,7 @@ function .tetris_right(~slot)
 		{
 			set ~collide 1
 		}
+		add ~i 1
 	}
 	sp_sc_flow_if number cvar ~collide == val "0"
 	{
@@ -300,6 +329,8 @@ function .tetris_right(~slot)
 		sp_sc_flow_while number cvar ~i < val "4"
 		{
 			sp_sc_cvar_copy _tet_seg_$i_x ~new_$i_x
+
+			add ~i 1
 		}
 	}
 }
@@ -349,6 +380,7 @@ function .tetris_rotate1(~slot)
 		{
 			set ~collide 1
 		}
+		add ~i 1
 	}
 	sp_sc_flow_if number cvar ~collide == val "0"
 	{
@@ -357,6 +389,7 @@ function .tetris_rotate1(~slot)
 		{
 			sp_sc_cvar_copy _tet_seg_$i_x ~new_$i_x
 			sp_sc_cvar_copy _tet_seg_$i_y ~new_$i_y
+			add ~i 1
 		}
 	}
 }
@@ -389,6 +422,7 @@ function .tetris_rotate2(~slot)
 		{
 			set ~collide 1
 		}
+		add ~i 1
 	}
 	sp_sc_flow_if number cvar ~collide == val "0"
 	{
@@ -397,6 +431,7 @@ function .tetris_rotate2(~slot)
 		{
 			sp_sc_cvar_copy _tet_seg_$i_x ~new_$i_x
 			sp_sc_cvar_copy _tet_seg_$i_y ~new_$i_y
+			add ~i 1
 		}
 	}
 }
