@@ -1,0 +1,38 @@
+
+
+loop:
+	//IS_SPAWN_FRAME?
+	if ( spawn frame ){
+		spawn
+		check_collision
+		if ( collide ) GameOver
+	} else {
+		//GRAVITY_CHECK
+		out=false
+		for all 4 pixels:
+			tmpx=pixel.x
+			tmpy=pixel.y-1
+			check_collision
+			if ( collide ) out=true
+		if out==true:
+			for all 4 pixels:
+				pixel.x=tmpx
+				pixel.y=tmpy
+		//GRAVITY_FAILED_SO_SHAPE_LANDED
+		else {
+			write_each_pixel_to_grid ( they merge with the grid now )
+			for each pixel:
+				if (row_completition){
+					if ($i not in list){
+						append $i to list
+					}
+				}
+			for all in list {
+				remove line and shift down...
+			}
+		}
+		set spawn_frame = true
+	}
+
+	for all pixels:
+		append thier draw_code to string

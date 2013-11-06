@@ -16,9 +16,15 @@ function fn_tet_OneTimeVars
 
 	set _tet_block_size "26"
 
+	set _tet_send_frames "0"
+
 	set _tet_loop_run "0"
 	set _tet_loop_busy "0"
 	set _tet_loop_speed "1000"
+
+	set _tet_floop_run "0"
+	set _tet_floop_busy "0"
+	set _tet_floop_speed "100"
 
 	set _tet_pics_1 "rr"
 	set _tet_pics_2 "yy"
@@ -36,7 +42,7 @@ function fn_tet_ReloadGame
 	set ~i 0
 	sp_sc_flow_while number cvar ~i < cvar _tet_jug_height
 	{
-		set _tet_jug_line_$i "0000000000"
+		set _tet_jug_line_$~i "0000000000"
 		add ~i 1
 	}
 
@@ -45,13 +51,14 @@ function fn_tet_ReloadGame
 	zero _tet_seg_x_3;zero _tet_seg_y_3
 	zero _tet_seg_x_4;zero _tet_seg_y_4
 
+	zero _tet_buffer
+
 	zero _tet_seg_base
-	zero _tet_shape
+	set _tet_shape "0"
 }
 //shapes defined from left to right in chain if possible
 function fn_tet_Spawn()
 {
-	say "fn_tet_spawn"
 	sp_sc_cvar_random_int ~rand 1 7
 	sp_sc_cvar_copy _tet_shape ~rand
 	//square
@@ -103,19 +110,19 @@ function fn_tet_Spawn()
 	//line
 	sp_sc_flow_if number cvar ~rand == val "6"
 	{
-		set _tet_seg_x_1 "3";set _tet_seg_y_1 "16"
-		set _tet_seg_x_2 "4";set _tet_seg_y_2 "16"
-		set _tet_seg_x_3 "5";set _tet_seg_y_3 "16"
-		set _tet_seg_x_4 "6";set _tet_seg_y_4 "16"
+		set _tet_seg_x_1 "3";set _tet_seg_y_1 "17"
+		set _tet_seg_x_2 "4";set _tet_seg_y_2 "17"
+		set _tet_seg_x_3 "5";set _tet_seg_y_3 "17"
+		set _tet_seg_x_4 "6";set _tet_seg_y_4 "17"
 		set _tet_seg_base "2"
 	}
 	//reversed L
 	sp_sc_flow_if number cvar ~rand == val "7"
 	{
-		set _tet_seg_x_1 "3";set _tet_seg_y_1 "16"
-		set _tet_seg_x_2 "4";set _tet_seg_y_2 "16"
-		set _tet_seg_x_3 "5";set _tet_seg_y_3 "16"
-		set _tet_seg_x_4 "5";set _tet_seg_y_4 "17"
+		set _tet_seg_x_1 "3";set _tet_seg_y_1 "17"
+		set _tet_seg_x_2 "4";set _tet_seg_y_2 "17"
+		set _tet_seg_x_3 "5";set _tet_seg_y_3 "17"
+		set _tet_seg_x_4 "5";set _tet_seg_y_4 "16"
 		set _tet_seg_base "2"
 	}
 }
@@ -139,27 +146,30 @@ function fn_tet_WriteToJug(~x,~y,~val)
 	sp_sc_cvar_append ~tmp #~tmp2
 
 	sp_sc_cvar_copy _tet_jug_line_$~y ~tmp
+	//sp_sc_cvar_list _tet_jug_line_*
 }
 
 //checks the location for out of bounds
 //or already occupied..(not empty)
 function fn_tet_DoesCollide(~x,~y)
 {
+
+	
 	sp_sc_flow_if number cvar ~x < val "0"
 	{
-		set bool 1
+		set _tet_bool 1
 	}
 	else
 	{
-		sp_sc_flow_if number cvar ~x > val "18"
+		sp_sc_flow_if number cvar ~x > val "9"
 		{
-			set bool 1
+			set _tet_bool 1
 		}
 		else
 		{
 			sp_sc_flow_if number cvar ~y < val "0"
 			{
-				set bool 1
+				set _tet_bool 1
 			}
 			else
 			{
@@ -168,13 +178,29 @@ function fn_tet_DoesCollide(~x,~y)
 				sp_sc_cvar_substr ~tmp _tet_jug_line_$~y #~x 1
 				sp_sc_flow_if number cvar ~tmp != val "0"
 				{
-					set bool 1
+					set _tet_bool 1
 				}
 				else
 				{
-					set bool 0
+					set _tet_bool 0
 				}
 			}
+		}
+	}
+	sp_sc_flow_if number cvar _tet_spawn == val "0"
+	{
+		//is it its self?
+		set ~i 0
+		sp_sc_flow_while number cvar ~i < val "5"
+		{
+			sp_sc_flow_if number cvar ~x == cvar _tet_seg_x_$~i
+			{
+				sp_sc_flow_if number cvar ~y == cvar _tet_seg_y_$~i
+				{
+					set _tet_bool 0
+				}
+			}
+			add ~i 1
 		}
 	}
 }
@@ -207,6 +233,65 @@ function .tetris_stop(~slot)
     }
 }
 
+function fn_tet_floop_stop()
+{
+	sp_sc_flow_if number cvar _tet_floop_busy == val "1"
+	{
+		set _tet_floop_run "0"
+	}
+}
+function fn_tet_floop_start()
+{
+	sp_sc_flow_if number cvar _tet_floop_busy == val "1"
+	{
+		say "please wait for current timer to unload"
+	}
+	else
+	{
+        set _tet_floop_run "1"
+        set _tet_floop_busy "1"
+        sp_sc_func_exec fn_tet_floop
+	}
+}
+//this loop was created to do things at faster intervals
+//in this case i need it to send data across multiple frames
+//since there is a limit ( buffer size ) which is not allowed to be crossed
+function fn_tet_floop()
+{
+	//loop code here	
+	sp_sv_info_frames
+	say $_sp_sv_info_frames
+	sp_sc_cvar_copy ~frame _sp_sv_info_frames;add ~frame 1
+	sp_sc_flow_if number cvar _tet_heart_frame == cvar ~frame
+	{
+		sp_sc_cvar_substr ~tmp _tet_buffer 0 1
+		sp_sc_flow_if text cvar ~tmp != val ""
+		{
+			say tet_floop found $_tet_buffer
+		}
+	}
+	
+	sp_sc_flow_if number cvar _tet_send_frames > val "0"
+	{
+		//send a fixed amount of the big buffer here
+		//use sp_sc_cvar_substr
+
+		add _tet_send_frames -1
+	}
+
+	sp_sc_flow_if number cvar _tet_floop_run == val "1"
+	{
+	   sp_sc_timer #_tet_floop_speed "sp_sc_func_exec fn_tet_floop"
+	}
+	else
+	{
+	   set _tet_floop_busy 0
+	}
+}
+
+
+
+
 //this is the heart of the game
 //1024 - 28 = 996
 //996 / 28 = 35
@@ -215,19 +300,19 @@ function .tetris_stop(~slot)
 //lump into clumps of 996
 function fn_tet_loop()
 {
-
+	sp_sv_info_frames
+	sp_sc_cvar_copy _tet_heart_frame _sp_sv_info_frames
 	sp_sc_flow_if number cvar _tet_spawn == val "1"
 	{
-		//reset the gate
-		set _tet_spawn 0
+		
 		sp_sc_func_exec fn_tet_Spawn
 		//check collision on new spawned object
 		//that is victory/defeat condition
 		set ~i 1
 		sp_sc_flow_while number cvar ~i < val "5"
 		{
-			sp_sc_cvar_copy ~name1 _tet_seg_x_$i
-			sp_sc_cvar_copy ~name2 _tet_seg_y_$i
+			sp_sc_cvar_copy ~name1 _tet_seg_x_$~i
+			sp_sc_cvar_copy ~name2 _tet_seg_y_$~i
 			sp_sc_func_exec fn_tet_DoesCollide #~name1 #~name2
 			sp_sc_flow_if number cvar _tet_bool == val "1"
 			{
@@ -237,6 +322,9 @@ function fn_tet_loop()
 			add ~i 1
 		}
 
+		//reset the gate
+		set _tet_spawn 0
+
 	}
 	else
 	{
@@ -245,10 +333,10 @@ function fn_tet_loop()
 		set ~i 1
 		sp_sc_flow_while number cvar ~i < val "5"
 		{
-			sp_sc_cvar_copy ~new_y_$i _tet_seg_y_$i
-			add ~new_y_$i -1
-			sp_sc_cvar_copy ~name1 _tet_seg_x_$i
-			sp_sc_cvar_copy ~name2 ~new_y_$i
+			sp_sc_cvar_copy ~new_y_$~i _tet_seg_y_$~i
+			add ~new_y_$~i -1
+			sp_sc_cvar_copy ~name1 _tet_seg_x_$~i
+			sp_sc_cvar_copy ~name2 ~new_y_$~i
 			sp_sc_func_exec fn_tet_DoesCollide #~name1 #~name2
 			sp_sc_flow_if number cvar _tet_bool == val "1"
 			{
@@ -262,19 +350,23 @@ function fn_tet_loop()
 			set ~i 1
 			sp_sc_flow_while number cvar ~i < val "5"
 			{
-				sp_sc_cvar_copy _tet_seg_y_$i ~new_y_$i
+				sp_sc_cvar_copy _tet_seg_y_$~i ~new_y_$~i
 				add ~i 1
 			}	
 		}
 		else
 		{
+			sp_sc_func_exec fn_tet_WriteToJug #_tet_seg_x_1 #_tet_seg_y_1 #_tet_shape
+			sp_sc_func_exec fn_tet_WriteToJug #_tet_seg_x_2 #_tet_seg_y_2 #_tet_shape
+			sp_sc_func_exec fn_tet_WriteToJug #_tet_seg_x_3 #_tet_seg_y_3 #_tet_shape
+			sp_sc_func_exec fn_tet_WriteToJug #_tet_seg_x_4 #_tet_seg_y_4 #_tet_shape
 			//landed on something, now we want to spawn next frame
 			//also apply line destruction here, checking only lines that the last segment consisted of
 			set ~i 1
 			sp_sc_flow_while number cvar ~i < val "5"
 			{
 				//get the y position of segment
-				sp_sc_cvar_copy ~tmp _tet_seg_y_$i
+				sp_sc_cvar_copy ~tmp _tet_seg_y_$~i
 				//get the line contents at there
 				sp_sc_cvar_copy ~tmp2 _tet_jug_line_$~tmp
 				sp_sc_flow_if text cvar ~tmp2 == val "1111111111"
@@ -297,18 +389,36 @@ function fn_tet_loop()
 			set _tet_spawn 1
 		}
 	}
-	sp_sc_func_exec fn_tet_WriteToJug #_tet_seg_x_0 #_tet_seg_y_0 #_tet_shape
-	sp_sc_func_exec fn_tet_WriteToJug #_tet_seg_x_1 #_tet_seg_y_1 #_tet_shape
-	sp_sc_func_exec fn_tet_WriteToJug #_tet_seg_x_2 #_tet_seg_y_2 #_tet_shape
-	sp_sc_func_exec fn_tet_WriteToJug #_tet_seg_x_3 #_tet_seg_y_3 #_tet_shape
+	set ~baseY "334";set ~baseX "-80"
+	//background_image y=120-240 (240 is half of height of bg image, 120 is to go to center of screen)
+ 	sset _tet_buffer sp_sv_print_sp_broadcast 45 %22* xv $~baseX yv -120 picn pics/zz
+	
+	//the 4 pixels
+ 	set ~i 1
+ 	sp_sc_flow_while number cvar ~i < val "5"
+ 	{
+ 		sp_sc_cvar_copy ~name _tet_seg_x_$~i
+ 		sp_sc_cvar_copy ~x _tet_block_size
+ 		sp_sc_cvar_math_mul ~x #~name
+ 		add ~x #~baseX
 
-	set ~fx 160;set ~fy 120;sp_sc_cvar_math_sub ~fx 240;sp_sc_cvar_math_sub ~fy 240
- 	sset ~string * xv #~fx yv #~fy picn pics/zz
+ 		sp_sc_cvar_copy ~y _tet_block_size
+ 		sp_sc_cvar_copy ~name _tet_seg_y_$~i
+ 		sp_sc_cvar_math_mul ~y #~name;sp_sc_cvar_math_mul ~y -1
+ 		add ~y #~baseY
 
-	add ~fy 480
-	add ~fy -26
+ 		sp_sc_cvar_copy ~color _tet_pics_$_tet_shape
+ 		sset ~string xv $~x yv $~y picn pics/$~color
+ 		sp_sc_cvar_append _tet_buffer " " #~string
+
+ 		add ~i 1
+ 	}
+ 	sp_sc_cvar_len ~total _tet_buffer
+    sp_sc_cvar_copy ~largetotal ~total
+
+    set ~zero 1 //default=zero _tet_buffer
+ 	//I will delimit broadcasts with % and frames with &
  	set ~j 0
- 	set ~count 29
  	sp_sc_flow_while number cvar ~j < cvar _tet_jug_height
  	{
  		set ~i 0
@@ -317,37 +427,76 @@ function fn_tet_loop()
  			sp_sc_cvar_substr ~color _tet_jug_line_$~j #~i 1
  			sp_sc_flow_if number cvar ~color != val "0"
  			{
- 				//say "found tile"
  				sp_sc_cvar_copy ~color _tet_pics_$~color
- 				set ~tmp "26"
- 				sp_sc_cvar_math_mul ~tmp #~i
- 				add ~tmp -80;sp_sc_cvar_copy ~fx ~tmp
- 				set ~tmp "-26"
- 				sp_sc_cvar_math_mul ~tmp ~j
- 				add ~tmp #~fy;sp_sc_cvar_copy ~yy ~tmp
- 				sset ~tmp xv #~fx yv #~yy picn pics/$~color
- 				sp_sc_cvar_append ~string " " #~tmp
- 				add ~count 28
- 				sp_sc_flow_if number cvar ~count > val "968"
+
+		 		sp_sc_cvar_copy ~x _tet_block_size
+		 		sp_sc_cvar_math_mul ~x #~i
+		 		add ~x #~baseX
+
+		 		sp_sc_cvar_copy ~y _tet_block_size
+		 		sp_sc_cvar_math_mul ~y #~j;sp_sc_cvar_math_mul ~y -1
+		 		add ~y #~baseY
+
+ 				sset ~string xv $~x yv $~y picn pics/$~color
+ 				sp_sc_cvar_len ~len ~string;add ~len 1;add ~total #~len
+ 				add ~largetotal #~total
+ 				//TOTAL+LEN+1(for_space)
+
+ 				//BIG_BOY_RESET
+ 				sp_sc_flow_if number cvar ~largetotal > val "1200"
  				{
- 					say inside #~string
- 					sp_sv_print_sp_broadcast 45 #~string
- 					set ~count 0
- 					zero ~string
+ 					say yikes
+ 					//we must place a delimitter for the frame
+ 					sp_sc_cvar_append _tet_buffer "&"
+ 					set ~largetotal 0
+ 					set ~total 0
+ 					set ~zero 0 //switch to say not to zero
  				}
+ 				else
+ 				{
+ 					//SMALL_BOY_RESET
+ 					sp_sc_flow_if number cvar ~total > val "256"
+ 					{
+ 						//it IS NOT SAFE
+ 						//so Mark The Spot!
+ 						sp_sc_cvar_append _tet_buffer ",sp_sv_print_sp_broadcast 45 %22"
+ 						sp_sc_cvar_append _tet_buffer #~string
+ 						//, already accounted for because there is no space put in this one
+ 						add ~largetotal 30
+ 						set ~total 0
+
+ 					}
+ 					else
+ 					{
+ 						//the buffer WILL NOT reach 256
+ 						//it is SAFE to add it
+ 						sp_sc_cvar_append _tet_buffer " " #~string	
+ 					}
+ 				}	
  			}
- 			
  			add ~i 1
  		}
  		add ~j 1
  	}
- 	say after #~string
- 	sp_sv_print_sp_broadcast 45 #~string
- 	//say "fn_tet_loop"
- 	
 
- 	//
- 	//say #~string
+ 	sp_sc_cvar_split ~frame , _tet_buffer
+ 	set ~i 1
+ 	sp_sc_flow_while number cvar ~i <= cvar ~frame_0
+ 	{
+ 		
+ 		say $~frame_$~i
+ 		sp_sc_cvar_append ~frame_$~i %22
+ 		sp_sc_cvar_unescape ~frame_$~i ~frame_$~i
+ 		sp_sc_exec_cvar ~frame_$~i
+ 		add ~i 1
+ 	}
+ 	
+ 	
+ 
+ 	sp_sc_flow_if number cvar ~zero == val "1"
+ 	{
+ 		zero _tet_buffer
+ 	}
 
 	sp_sc_flow_if number cvar _tet_loop_run == val "1"
 	{
@@ -358,6 +507,10 @@ function fn_tet_loop()
 	   set _tet_loop_busy 0
 	}
 }
+
+
+
+//_sp_sv_info_frames
 
 function .test(~slot)
 {
@@ -379,10 +532,10 @@ function .tetris_left(~slot)
 
 	sp_sc_flow_while number cvar ~i < val "5"
 	{
-		sp_sc_cvar_copy ~new_x_$i _tet_seg_x_$i
-		add ~new_x_$i -1
-		sp_sc_cvar_copy ~name1 ~new_x_$i
-		sp_sc_cvar_copy ~name2 _tet_seg_y_$i
+		sp_sc_cvar_copy ~new_x_$~i _tet_seg_x_$~i
+		add ~new_x_$~i -1
+		sp_sc_cvar_copy ~name1 ~new_x_$~i
+		sp_sc_cvar_copy ~name2 _tet_seg_y_$~i
 		sp_sc_func_exec fn_tet_DoesCollide #~name1 #~name2
 		sp_sc_flow_if number cvar _tet_bool == val "1"
 		{
@@ -395,7 +548,7 @@ function .tetris_left(~slot)
 		set ~i 1
 		sp_sc_flow_while number cvar ~i < val "5"
 		{
-			sp_sc_cvar_copy _tet_seg_x_$i ~new_x_$i
+			sp_sc_cvar_copy _tet_seg_x_$~i ~new_x_$~i
 			add ~i 1
 		}
 	}
@@ -407,11 +560,11 @@ function .tetris_right(~slot)
 
 	sp_sc_flow_while number cvar ~i < val "5"
 	{
-		sp_sc_cvar_copy ~new_x_$i _tet_seg_x_$i
-		add ~new_x_$i 1
+		sp_sc_cvar_copy ~new_x_$~i _tet_seg_x_$~i
+		add ~new_x_$~i 1
 		
-		sp_sc_cvar_copy ~name1 ~new_x_$i
-		sp_sc_cvar_copy ~name2 _tet_seg_y_$i
+		sp_sc_cvar_copy ~name1 ~new_x_$~i
+		sp_sc_cvar_copy ~name2 _tet_seg_y_$~i
 
 		sp_sc_func_exec fn_tet_DoesCollide #~name1 #~name2
 		sp_sc_flow_if number cvar _tet_bool == val "1"
@@ -425,7 +578,7 @@ function .tetris_right(~slot)
 		set ~i 1
 		sp_sc_flow_while number cvar ~i < val "5"
 		{
-			sp_sc_cvar_copy _tet_seg_x_$i ~new_x_$i
+			sp_sc_cvar_copy _tet_seg_x_$~i ~new_x_$~i
 
 			add ~i 1
 		}
@@ -448,6 +601,8 @@ function .tetris_right(~slot)
 //	}
 //}
 //clockwise
+//CW --> y= -x
+//x = y
 function .tetris_rotate1(~slot)
 {
 
@@ -456,27 +611,40 @@ function .tetris_rotate1(~slot)
 
 	sp_sc_flow_while number cvar ~i < val "5"
 	{
-		//pX=pX+(pX-bX)
-		//pY=pY+(pY-bY)
+		//pX=baseX+(pY-bY)
+		//pY=baseY+(pX-bX)
 		//newoffY=oldoffX*-1
 		//newoffX=oldoffY*-1 
-		sp_sc_cvar_copy ~tmp_x_$i _tet_seg_x_$i
-		sp_sc_cvar_copy ~tmp_y_$i _tet_seg_y_$i
-		sp_sc_cvar_math_sub ~tmp_x_$i _tet_seg_x_$_tet_seg_base
-		sp_sc_cvar_math_sub ~tmp_y_$i _tet_seg_y_$_tet_seg_base
-		sp_sc_cvar_math_mul ~tmp_x_$i -1
-		sp_sc_cvar_math_mul ~tmp_y_$i -1
-		sp_sc_cvar_copy ~new_x_$i _tet_seg_x_$_tet_seg_base
-		sp_sc_cvar_copy ~new_y_$i _tet_seg_y_$_tet_seg_base
-		sp_sc_cvar_copy ~name ~tmp_x_$i
-		add ~new_x_$i #~name
-		sp_sc_cvar_copy ~name ~tmp_x_$i
-		add ~new_y_$i #~name
-		sp_sc_cvar_copy ~new_x_$i _tet_seg_y_$i;
-		sp_sc_cvar_copy ~new_y_$i _tet_seg_x_$i;
 
-		sp_sc_cvar_copy ~name1 ~new_x_$i
-		sp_sc_cvar_copy ~name2 ~new_y_$i
+		//~tmp == offset_from_base
+
+		//x = x - baseX
+		sp_sc_cvar_copy ~tmp_x_$~i _tet_seg_x_$~i
+		sp_sc_cvar_copy ~tmp_y_$~i _tet_seg_y_$~i
+		sp_sc_cvar_copy ~name _tet_seg_x_$_tet_seg_base
+		sp_sc_cvar_math_sub ~tmp_x_$~i #~name
+
+		//y = y - baseY
+		sp_sc_cvar_copy ~name _tet_seg_y_$_tet_seg_base
+		sp_sc_cvar_math_sub ~tmp_y_$~i #~name
+
+		//x = x * -1
+		//y = y * -1
+		sp_sc_cvar_math_mul ~tmp_x_$~i -1
+
+		//base + 
+		sp_sc_cvar_copy ~new_x_$~i _tet_seg_x_$_tet_seg_base
+		sp_sc_cvar_copy ~new_y_$~i _tet_seg_y_$_tet_seg_base
+
+		//offset
+		sp_sc_cvar_copy ~name ~tmp_y_$~i
+		add ~new_x_$~i #~name
+
+		sp_sc_cvar_copy ~name ~tmp_x_$~i
+		add ~new_y_$~i #~name
+
+		sp_sc_cvar_copy ~name1 ~new_x_$~i
+		sp_sc_cvar_copy ~name2 ~new_y_$~i
 		sp_sc_func_exec fn_tet_DoesCollide #~name1 #~name2
 		sp_sc_flow_if number cvar _tet_bool == val "1"
 		{
@@ -489,40 +657,57 @@ function .tetris_rotate1(~slot)
 		set ~i 1
 		sp_sc_flow_while number cvar ~i < val "5"
 		{
-			sp_sc_cvar_copy _tet_seg_x_$i ~new_x_$i
-			sp_sc_cvar_copy _tet_seg_y_$i ~new_y_$i
+			sp_sc_cvar_copy _tet_seg_x_$~i ~new_x_$~i
+			sp_sc_cvar_copy _tet_seg_y_$~i ~new_y_$~i
 			add ~i 1
 		}
 	}
 }
 //anticlockwise
+//ACW --> y= x
+//x = -y
 function .tetris_rotate2(~slot)
 {
+	
 	set ~collide 0
 	set ~i 1
 
 	sp_sc_flow_while number cvar ~i < val "5"
 	{
-		//pX=pX+(pX-bX)
-		//pY=pY+(pY-bY)
-		//newoffY=oldoffX
+		//pX=baseX+(pY-bY)
+		//pY=baseY+(pX-bX)
+		//newoffY=oldoffX*-1
 		//newoffX=oldoffY*-1 
-		sp_sc_cvar_copy ~tmp_x_$i _tet_seg_x_$i
-		sp_sc_cvar_copy ~tmp_y_$i _tet_seg_y_$i
-		sp_sc_cvar_math_sub ~tmp_x_$i _tet_seg_x_$_tet_seg_base
-		sp_sc_cvar_math_sub ~tmp_y_$i _tet_seg_y_$_tet_seg_base
-		sp_sc_cvar_math_mul ~tmp_x_$i -1
-		sp_sc_cvar_math_mul ~tmp_y_$i -1
-		sp_sc_cvar_copy ~new_x_$i _tet_seg_x_$_tet_seg_base
-		sp_sc_cvar_copy ~new_y_$i _tet_seg_y_$_tet_seg_base
-		sp_sc_cvar_copy ~name ~tmp_x_$i
-		add ~new_x_$i #~name
-		sp_sc_cvar_copy ~name ~tmp_x_$i
-		add ~new_y_$i #~name
-		sp_sc_cvar_copy ~new_x_$i _tet_seg_y_$i;
-		sp_sc_cvar_copy ~new_y_$i _tet_seg_x_$i;
-		sp_sc_cvar_copy ~name1 ~new_x_$i
-		sp_sc_cvar_copy ~name2 ~new_y_$i
+
+		//~tmp == offset_from_base
+
+		//x = x - baseX
+		sp_sc_cvar_copy ~tmp_x_$~i _tet_seg_x_$~i
+		sp_sc_cvar_copy ~tmp_y_$~i _tet_seg_y_$~i
+		sp_sc_cvar_copy ~name _tet_seg_x_$_tet_seg_base
+		sp_sc_cvar_math_sub ~tmp_x_$~i #~name
+
+		//y = y - baseY
+		sp_sc_cvar_copy ~name _tet_seg_y_$_tet_seg_base
+		sp_sc_cvar_math_sub ~tmp_y_$~i #~name
+
+		//x = x * -1
+		//y = y * -1
+		sp_sc_cvar_math_mul ~tmp_y_$~i -1
+
+		//base + 
+		sp_sc_cvar_copy ~new_x_$~i _tet_seg_x_$_tet_seg_base
+		sp_sc_cvar_copy ~new_y_$~i _tet_seg_y_$_tet_seg_base
+
+		//offset
+		sp_sc_cvar_copy ~name ~tmp_y_$~i
+		add ~new_x_$~i #~name
+
+		sp_sc_cvar_copy ~name ~tmp_x_$~i
+		add ~new_y_$~i #~name
+
+		sp_sc_cvar_copy ~name1 ~new_x_$~i
+		sp_sc_cvar_copy ~name2 ~new_y_$~i
 		sp_sc_func_exec fn_tet_DoesCollide #~name1 #~name2
 		sp_sc_flow_if number cvar _tet_bool == val "1"
 		{
@@ -535,8 +720,8 @@ function .tetris_rotate2(~slot)
 		set ~i 1
 		sp_sc_flow_while number cvar ~i < val "5"
 		{
-			sp_sc_cvar_copy _tet_seg_x_$i ~new_x_$i
-			sp_sc_cvar_copy _tet_seg_y_$i ~new_y_$i
+			sp_sc_cvar_copy _tet_seg_x_$~i ~new_x_$~i
+			sp_sc_cvar_copy _tet_seg_y_$~i ~new_y_$~i
 			add ~i 1
 		}
 	}
