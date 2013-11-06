@@ -1,5 +1,6 @@
 function .tetris_load(~slot)
 {
+	sp_sc_func_exec spf_sc_list_add_func _sp_sv_on_client_userinfo_change "fn_tet_uc"
 	sp_sc_func_exec fn_tet_OneTimeVars
 }
 
@@ -16,7 +17,7 @@ function fn_tet_OneTimeVars
 
 	set _tet_block_size "26"
 
-	set _tet_send_frames "0"
+	set _tet_heart_frame "0"
 
 	set _tet_loop_run "0"
 	set _tet_loop_busy "0"
@@ -52,6 +53,8 @@ function fn_tet_ReloadGame
 	zero _tet_seg_x_4;zero _tet_seg_y_4
 
 	zero _tet_buffer
+	zero _tet_frames
+	zero _tet_frame_it
 
 	zero _tet_seg_base
 	set _tet_shape "0"
@@ -220,6 +223,8 @@ function .tetris_start(~slot)
         set _tet_loop_run "1"
         set _tet_loop_busy "1"
         sp_sc_func_exec fn_tet_loop
+
+        sp_sc_func_exec fn_tet_floop_start
     }
 }
 
@@ -231,6 +236,7 @@ function .tetris_stop(~slot)
     	say "stopping tetris"
         set _tet_loop_run "0"
     }
+    sp_sc_func_exec fn_tet_floop_stop
 }
 
 function fn_tet_floop_stop()
@@ -260,24 +266,27 @@ function fn_tet_floop()
 {
 	//loop code here	
 	sp_sv_info_frames
-	say $_sp_sv_info_frames
-	sp_sc_cvar_copy ~frame _sp_sv_info_frames;add ~frame 1
-	sp_sc_flow_if number cvar _tet_heart_frame == cvar ~frame
+	sp_sc_cvar_copy ~frame _tet_heart_frame;add ~frame 1
+	sp_sc_flow_if number cvar _sp_sv_info_frames == cvar ~frame
 	{
-		sp_sc_cvar_substr ~tmp _tet_buffer 0 1
-		sp_sc_flow_if text cvar ~tmp != val ""
+		sp_sc_flow_if number cvar _tet_frame_it <= cvar _tet_frames_0
 		{
-			say tet_floop found $_tet_buffer
+			sp_sc_cvar_split ~broad , _tet_frames_$_tet_frame_it
+			set ~i 1
+			sp_sc_flow_while number cvar ~i <= cvar ~broad_0
+			{
+				sp_sc_cvar_copy ~name ~broad_$~i
+				say #~name
+				sp_sc_cvar_append ~broad_$~i %22
+				sp_sc_cvar_unescape ~broad_$~i ~broad_$~i
+				sp_sc_exec_cvar ~broad_$~i
+				add ~i 1
+			}
+
+			add _tet_frame_it 1
 		}
 	}
 	
-	sp_sc_flow_if number cvar _tet_send_frames > val "0"
-	{
-		//send a fixed amount of the big buffer here
-		//use sp_sc_cvar_substr
-
-		add _tet_send_frames -1
-	}
 
 	sp_sc_flow_if number cvar _tet_floop_run == val "1"
 	{
@@ -416,7 +425,6 @@ function fn_tet_loop()
  	sp_sc_cvar_len ~total _tet_buffer
     sp_sc_cvar_copy ~largetotal ~total
 
-    set ~zero 1 //default=zero _tet_buffer
  	//I will delimit broadcasts with % and frames with &
  	set ~j 0
  	sp_sc_flow_while number cvar ~j < cvar _tet_jug_height
@@ -443,26 +451,25 @@ function fn_tet_loop()
  				//TOTAL+LEN+1(for_space)
 
  				//BIG_BOY_RESET
- 				sp_sc_flow_if number cvar ~largetotal > val "1200"
+ 				sp_sc_flow_if number cvar ~largetotal > val "800"
  				{
- 					say yikes
+ 					//say rofl
  					//we must place a delimitter for the frame
- 					sp_sc_cvar_append _tet_buffer "&"
- 					set ~largetotal 0
- 					set ~total 0
- 					set ~zero 0 //switch to say not to zero
+ 					sp_sc_cvar_append _tet_buffer "&sp_sv_print_sp_broadcast 45 %22"
+ 					set ~largetotal 29
+ 					set ~total 29
  				}
  				else
  				{
- 					//SMALL_BOY_RESET
- 					sp_sc_flow_if number cvar ~total > val "256"
+ 					//SMALL_BOY_RESET 233
+ 					sp_sc_flow_if number cvar ~total > val "200"
  					{
  						//it IS NOT SAFE
  						//so Mark The Spot!
  						sp_sc_cvar_append _tet_buffer ",sp_sv_print_sp_broadcast 45 %22"
  						sp_sc_cvar_append _tet_buffer #~string
  						//, already accounted for because there is no space put in this one
- 						add ~largetotal 30
+ 						add ~largetotal 29
  						set ~total 0
 
  					}
@@ -479,24 +486,25 @@ function fn_tet_loop()
  		add ~j 1
  	}
 
- 	sp_sc_cvar_split ~frame , _tet_buffer
- 	set ~i 1
- 	sp_sc_flow_while number cvar ~i <= cvar ~frame_0
- 	{
- 		
- 		say $~frame_$~i
- 		sp_sc_cvar_append ~frame_$~i %22
- 		sp_sc_cvar_unescape ~frame_$~i ~frame_$~i
- 		sp_sc_exec_cvar ~frame_$~i
- 		add ~i 1
- 	}
- 	
- 	
- 
- 	sp_sc_flow_if number cvar ~zero == val "1"
- 	{
- 		zero _tet_buffer
- 	}
+ 	set _tet_frame_it 2
+ 	sp_sc_cvar_split _tet_frames & _tet_buffer
+ 	say #_tet_frames_0
+ 	// set ~j 1
+ 	// sp_sc_flow_while number cvar ~j <= val "1"
+ 	// {
+ 		sp_sc_cvar_split ~broad , _tet_frames_1
+ 		set ~i 1
+ 		sp_sc_flow_while number cvar ~i <= cvar ~broad_0
+ 		{
+ 			//sp_sc_cvar_copy ~name ~broad_$~i
+ 			//say #~name
+ 			sp_sc_cvar_append ~broad_$~i %22
+ 			sp_sc_cvar_unescape ~broad_$~i ~broad_$~i
+ 			sp_sc_exec_cvar ~broad_$~i
+ 			add ~i 1
+ 		}
+ 	// 	add ~j 1
+ 	// }
 
 	sp_sc_flow_if number cvar _tet_loop_run == val "1"
 	{
@@ -725,4 +733,12 @@ function .tetris_rotate2(~slot)
 			add ~i 1
 		}
 	}
+}
+
+
+function fn_tet_uc( ~slot )
+{
+  sp_sv_info_client #~slot
+  say #_sp_sv_info_client_skin
+  say #_sp_sv_info_client_name
 }
